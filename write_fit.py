@@ -19,6 +19,14 @@ trackpoints = []
 
 # FIT lat/lon units
 def degree_to_semicircle(degree):
+    """Converts degrees to semicircles.
+    
+    Args:
+        degree (float): The angle in degrees to be converted.
+    
+    Returns:
+        int: The angle converted to semicircles, represented as an integer.
+    """
     return int(degree * (2**31 / 180))
 
 # GPX samples don't have distance, but FIT requires it. Simple estimation of distance
@@ -26,6 +34,15 @@ def degree_to_semicircle(degree):
 # p1, p2 are (lat, lon) in degrees
 # Result is in cm
 def distance_ll(p1, p2):
+    """Calculate the distance between two geographical points on Earth.
+    
+    Args:
+        p1 (list): A list containing the latitude and longitude of the first point in degrees.
+        p2 (list): A list containing the latitude and longitude of the second point in degrees.
+    
+    Returns:
+        int: The distance between the two points in centimeters.
+    """
     p1 = [x*math.pi/180.0 for x in p1]
     p2 = [x*math.pi/180.0 for x in p2]
     x = (p2[1]-p1[1]) * math.cos((p1[0]+p1[1])/2);
@@ -34,6 +51,31 @@ def distance_ll(p1, p2):
 
 
 def step_tcx(data):
+    """Processes TCX (Training Center XML) data to extract course and lap information.
+    
+    Args:
+        data (Element): An XML Element object representing the TCX data.
+    
+    Returns:
+        None: This function modifies global variables (trackpoints, laps, track_name) instead of returning values.
+    
+    This function parses TCX data to extract course information, including track name, lap details, and trackpoints.
+    It populates global variables with the extracted data:
+    - trackpoints: List of tuples containing timestamp, latitude, longitude, and distance for each trackpoint.
+    - laps: List of tuples containing lap start times.
+    - track_name: String containing the name of the track.
+    
+    The function handles both Garmin Connect and RideWithGPS time formats.
+    It converts latitude and longitude from degrees to semicircles.
+    Distances are converted from meters to centimeters.
+    
+    Note:
+        This function relies on several global variables and helper functions that are not shown in the provided code snippet:
+        - epoch: A datetime object used as a reference point for calculating elapsed time.
+        - degree_to_semicircle: A function to convert degrees to semicircles.
+        - trackpoints: A global list to store trackpoint data.
+        - laps: A global list to store lap data.
+    """
     partial_laps = []
     # Lap start _time_ needs to be logged... same as the timestamp?
     def track_point(node):
@@ -80,6 +122,28 @@ def step_tcx(data):
                 break
 
 def step_gpx(data):
+    """Process GPX data and extract track information.
+    
+    Args:
+        data (Element): An XML Element object containing GPX track data.
+    
+    Returns:
+        None: This function does not return a value, but updates global variables.
+    
+    This function processes GPX data to extract track information. It sets the global
+    'track_name' variable and appends to the global 'trackpoints' list. Each trackpoint
+    consists of a tuple containing time, latitude, longitude, and distance from the
+    previous point.
+    
+    The function iterates through trackpoints, converting coordinates to semicircles
+    and calculating distances between consecutive points. Time is arbitrarily
+    incremented for each point.
+    
+    Note:
+        - This function assumes the existence of global variables 'track_name' and 'trackpoints'.
+        - It also assumes the existence of helper functions 'distance_ll' and 'degree_to_semicircle'.
+        - The time values are arbitrary and incremented by 100 for each point.
+    """
     global track_name
     track_name = data.find("trk/name").text + "\0"
 
@@ -99,6 +163,16 @@ def step_gpx(data):
         last_point = (lat, lon)
 
 def remove_namespace(tree, ns):
+    """Remove XML namespace from element tags in an ElementTree.
+    
+    Args:
+        tree (xml.etree.ElementTree.ElementTree): The XML ElementTree to modify.
+        ns (str): The namespace prefix to remove.
+    
+    Returns:
+        None: This function modifies the tree in-place and does not return a value.
+    
+    """
     nsl = len(ns)
     for elem in tree.getiterator():
         if elem.tag.startswith(ns):
@@ -130,6 +204,20 @@ else:
 def write_field(id, spec, write_data = True, record_id = 0):
     # From table 4-6 in the spec
     # name -> base type field, size (bytes), python struct name
+    """Writes a field definition and optionally field data to a binary format.
+    
+    This function is used to create binary representations of fields according to the FIT file format specification. It handles various data types and their corresponding binary encodings.
+    
+    Args:
+        id (int): The global field number.
+        spec (list): A list of tuples, each containing field definition information (field number, data type, and value).
+        write_data (bool, optional): If True, includes the field data in the output. Defaults to True.
+        record_id (int, optional): The local record ID. Defaults to 0.
+    
+    Returns:
+        bytes: A byte string containing the encoded field definition and optionally the field data.
+    
+    """
     types = {"enum": (0x00, 1, "B"),
             "sint8": (0x01, 1, "b"),
             "uint8": (0x02, 1, "B"),
@@ -228,6 +316,15 @@ out.write(write_field(21, [
 
 out.seek(14, 0) # Skip over the header, not included in the calculation
 def checksum(f):
+    """Calculate the CRC-16 checksum of a file's contents.
+    
+    Args:
+        f (file): An open file object to read bytes from.
+    
+    Returns:
+        int: The calculated CRC-16 checksum.
+    
+    """
     bytes = f.read()
     crc_table = [0x0, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401,
             0xA001, 0x6C00, 0x7800, 0xB401, 0x5000, 0x9C01, 0x8801, 0x4400]
