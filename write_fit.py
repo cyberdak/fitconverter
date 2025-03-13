@@ -4,14 +4,16 @@
 import sys
 import struct
 import datetime
+import iso8601
 import time
+import pytz
 import binascii
 import math
 from xml.dom.minidom import parse
 import xml.etree.ElementTree as ET
 
 # Garmin-defined
-epoch = datetime.datetime(1989, 12, 31, 0, 0, 0)
+epoch = datetime.datetime(1989, 12, 31, 0, 0, 0, tzinfo=pytz.UTC)
 
 track_name = ""
 laps = []
@@ -38,12 +40,7 @@ def step_tcx(data):
     # Lap start _time_ needs to be logged... same as the timestamp?
     def track_point(node):
         time_raw = node.find("Time").text
-        # Garmin Connect  includes .%f, RideWithGPS doesn't.
-        if '.' in time_raw:
-            format = "%Y-%m-%dT%H:%M:%S.%fZ"
-        else:
-            format = "%Y-%m-%dT%H:%M:%S"
-        time = datetime.datetime.strptime(time_raw, format)
+        time = iso8601.parse_date(time_raw)
         etime = time - epoch
         distance = int(float(node.find("DistanceMeters").text)*100)
         # Should probably XPath this
@@ -175,7 +172,7 @@ out.write(write_field(0, [
     (1, "uint16", 1), # manufacturer
     (2, "uint16", 1), # product
     (3, "uint32z", 1), # serial
-    (4, "uint32", int((datetime.datetime.utcnow() - epoch).total_seconds())) # time_created
+    (4, "uint32", int((datetime.datetime.now(tz=pytz.UTC) - epoch).total_seconds())) # time_created
         ]))
 
 # 31, course
